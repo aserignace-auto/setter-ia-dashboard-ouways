@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Zap, MessageSquare, Calendar } from 'lucide-react';
 import { Lead } from '@/types/lead';
+import { supabase } from '@/lib/supabase-client';
 import Header from './Header';
 import StatsCard from './StatsCard';
 import Pipeline from './Pipeline';
@@ -17,7 +18,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
-  const [previousLeadCount, setPreviousLeadCount] = useState(0);
+  const initialLoadDone = useRef(false);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -27,11 +28,6 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        if (previousLeadCount > 0 && data.length > previousLeadCount) {
-          const newLeadsCount = data.length - previousLeadCount;
-          setNotification(`${newLeadsCount} nouveau${newLeadsCount > 1 ? 'x' : ''} lead${newLeadsCount > 1 ? 's' : ''} !`);
-        }
-        setPreviousLeadCount(data.length);
         setLeads(data);
         setIsConnected(true);
       }
@@ -40,14 +36,57 @@ export default function Dashboard() {
       setIsConnected(false);
     } finally {
       setIsLoading(false);
+      initialLoadDone.current = true;
     }
-  }, [previousLeadCount]);
+  }, []);
 
+  // Fetch initial + polling backup toutes les 30 secondes
   useEffect(() => {
     fetchLeads();
-    const interval = setInterval(fetchLeads, 5000);
+    const interval = setInterval(fetchLeads, 30000);
     return () => clearInterval(interval);
   }, [fetchLeads]);
+
+  // Abonnement Supabase Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel('leads_charles_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads_charles',
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setLeads((current) => [payload.new as Lead, ...current]);
+            if (initialLoadDone.current) {
+              setNotification('Nouveau lead !');
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            setLeads((current) =>
+              current.map((lead) =>
+                lead.id === payload.new.id ? (payload.new as Lead) : lead
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setLeads((current) =>
+              current.filter((lead) => lead.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime connecté');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleRefresh = () => {
     setIsLoading(true);

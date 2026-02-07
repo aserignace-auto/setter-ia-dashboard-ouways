@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Zap, MessageSquare, Calendar } from 'lucide-react';
 import { Lead } from '@/types/lead';
-import { supabase } from '@/lib/supabase-client';
 import Header from './Header';
 import StatsCard from './StatsCard';
 import Pipeline from './Pipeline';
@@ -18,7 +17,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
-  const initialLoadDone = useRef(false);
+  const previousLeadCount = useRef(0);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -28,6 +27,12 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (Array.isArray(data)) {
+        // Détecter les nouveaux leads
+        if (previousLeadCount.current > 0 && data.length > previousLeadCount.current) {
+          const newCount = data.length - previousLeadCount.current;
+          setNotification(`${newCount} nouveau${newCount > 1 ? 'x' : ''} lead${newCount > 1 ? 's' : ''} !`);
+        }
+        previousLeadCount.current = data.length;
         setLeads(data);
         setIsConnected(true);
       }
@@ -36,57 +41,15 @@ export default function Dashboard() {
       setIsConnected(false);
     } finally {
       setIsLoading(false);
-      initialLoadDone.current = true;
     }
   }, []);
 
-  // Fetch initial + polling backup toutes les 30 secondes
+  // Fetch initial + polling toutes les 5 secondes
   useEffect(() => {
     fetchLeads();
-    const interval = setInterval(fetchLeads, 30000);
+    const interval = setInterval(fetchLeads, 5000);
     return () => clearInterval(interval);
   }, [fetchLeads]);
-
-  // Abonnement Supabase Realtime
-  useEffect(() => {
-    const channel = supabase
-      .channel('leads_ouways_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'leads_ouways',
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setLeads((current) => [payload.new as Lead, ...current]);
-            if (initialLoadDone.current) {
-              setNotification('Nouveau lead !');
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            setLeads((current) =>
-              current.map((lead) =>
-                lead.id === payload.new.id ? (payload.new as Lead) : lead
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setLeads((current) =>
-              current.filter((lead) => lead.id !== payload.old.id)
-            );
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Realtime connecté');
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   const getConversationArray = (historique: any): any[] => {
     if (!historique) return [];

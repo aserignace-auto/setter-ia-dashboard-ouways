@@ -13,7 +13,7 @@ export async function GET() {
 
   try {
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/leads_charles?select=*&order=created_at.desc`,
+      `${supabaseUrl}/rest/v1/leads_ouways?select=*&order=created_at.desc`,
       {
         headers: {
           'apikey': supabaseKey,

@@ -19,6 +19,61 @@ export default function Dashboard() {
   const [notification, setNotification] = useState<string | null>(null);
   const previousLeadCount = useRef(0);
 
+  // Agent global ON/OFF
+  const [isAgentActive, setIsAgentActive] = useState(true);
+  const [agentLoading, setAgentLoading] = useState(false);
+
+  // Fetch agent status au chargement
+  useEffect(() => {
+    async function fetchAgentStatus() {
+      try {
+        const res = await fetch('/api/agent-status');
+        const data = await res.json();
+        setIsAgentActive(data.is_active ?? true);
+      } catch {
+        // Par défaut ON
+      }
+    }
+    fetchAgentStatus();
+  }, []);
+
+  // Toggle agent global
+  const handleToggleAgent = useCallback(async (active: boolean) => {
+    setAgentLoading(true);
+    try {
+      const res = await fetch('/api/agent-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: active }),
+      });
+      if (res.ok) {
+        setIsAgentActive(active);
+        setNotification(active ? 'Agent IA activé' : 'Agent IA désactivé');
+      }
+    } catch {
+      setNotification('Erreur lors du changement de statut');
+    }
+    setAgentLoading(false);
+  }, []);
+
+  // Toggle IA per lead
+  const handleToggleLeadAI = useCallback(async (leadId: string, paused: boolean) => {
+    try {
+      const res = await fetch('/api/leads/toggle-ai', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId, is_ai_paused: paused }),
+      });
+      if (res.ok) {
+        setLeads(prev =>
+          prev.map(l => l.id === leadId ? { ...l, is_ai_paused: paused } : l)
+        );
+      }
+    } catch {
+      console.error('Erreur toggle IA lead');
+    }
+  }, []);
+
   const fetchLeads = useCallback(async () => {
     try {
       const response = await fetch('/api/leads');
@@ -106,7 +161,20 @@ export default function Dashboard() {
         <Header
           isConnected={isConnected}
           isLoading={isLoading}
+          isAgentActive={isAgentActive}
+          onToggleAgent={handleToggleAgent}
+          agentLoading={agentLoading}
         />
+
+        {/* Bandeau agent OFF */}
+        {!isAgentActive && (
+          <div className="mb-6 px-5 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 opacity-0 animate-fade-up">
+            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+            <p className="text-sm font-medium text-red-700">
+              Agent IA désactivé — Les messages Instagram ne sont plus traités automatiquement.
+            </p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -153,7 +221,7 @@ export default function Dashboard() {
         </div>
 
         {/* Leads Table */}
-        <LeadsTable leads={leads} />
+        <LeadsTable leads={leads} onToggleLeadAI={handleToggleLeadAI} />
       </div>
     </div>
   );

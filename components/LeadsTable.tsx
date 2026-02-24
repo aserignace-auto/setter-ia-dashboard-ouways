@@ -55,8 +55,11 @@ function LeadAIToggle({ lead, onToggle }: { lead: Lead; onToggle: (leadId: strin
 
   async function handleClick() {
     setLoading(true);
-    await onToggle(lead.id, !isPaused);
-    setLoading(false);
+    try {
+      await onToggle(lead.id, !isPaused);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

@@ -80,8 +80,8 @@ export default function Pipeline({ leads }: PipelineProps) {
 
       <div className="grid grid-cols-4 gap-4">
         {stageCounts.map((stage, index) => (
-          <div key={stage.key} className="text-center">
-            <div className="relative">
+          <div key={stage.key} className="text-center relative">
+            <div>
               <div className="text-3xl font-bold gold-gradient-text mb-2">
                 {stage.count}
               </div>

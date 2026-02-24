@@ -2,7 +2,6 @@
 
 interface HeaderProps {
   isConnected: boolean;
-  isLoading: boolean;
   isAgentActive: boolean;
   onToggleAgent: (active: boolean) => void;
   agentLoading: boolean;

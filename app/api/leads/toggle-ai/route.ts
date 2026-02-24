@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+const CLIENT_ID = 'ouways';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function PATCH(request: Request) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -11,12 +14,12 @@ export async function PATCH(request: Request) {
   try {
     const { leadId, is_ai_paused } = await request.json();
 
-    if (!leadId || typeof is_ai_paused !== 'boolean') {
+    if (!leadId || !UUID_REGEX.test(leadId) || typeof is_ai_paused !== 'boolean') {
       return NextResponse.json({ error: 'Paramètres invalides' }, { status: 400 });
     }
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/leads?id=eq.${leadId}`,
+      `${supabaseUrl}/rest/v1/leads?id=eq.${leadId}&client_id=eq.${CLIENT_ID}`,
       {
         method: 'PATCH',
         headers: {

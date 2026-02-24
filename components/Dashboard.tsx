@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Users, Zap, MessageSquare, Calendar } from 'lucide-react';
 import { Lead } from '@/types/lead';
 import Header from './Header';
@@ -120,7 +120,7 @@ export default function Dashboard() {
     return [];
   };
 
-  const getStats = () => {
+  const stats = useMemo(() => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -133,9 +133,7 @@ export default function Dashboard() {
       }, 0),
       rdvPris: leads.filter(l => l.statut === 'rdv_pris').length,
     };
-  };
-
-  const stats = getStats();
+  }, [leads]);
 
   if (isLoading && leads.length === 0) {
     return (
@@ -160,7 +158,6 @@ export default function Dashboard() {
 
         <Header
           isConnected={isConnected}
-          isLoading={isLoading}
           isAgentActive={isAgentActive}
           onToggleAgent={handleToggleAgent}
           agentLoading={agentLoading}

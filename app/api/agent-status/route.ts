@@ -45,6 +45,26 @@ export async function GET() {
           body: JSON.stringify({ is_active: true, client_id: CLIENT_ID }),
         }
       );
+
+      if (!createRes.ok) {
+        const retryRes = await fetch(
+          `${supabaseUrl}/rest/v1/${TABLE}?select=*&client_id=eq.${CLIENT_ID}&limit=1`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+          }
+        );
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          return NextResponse.json(retryData[0] || { is_active: true });
+        }
+        return NextResponse.json({ is_active: true, fallback: true });
+      }
+
       const created = await createRes.json();
       return NextResponse.json(created[0] || { is_active: true });
     }
@@ -52,7 +72,7 @@ export async function GET() {
     return NextResponse.json(data[0]);
   } catch (error) {
     console.error('Erreur agent status GET:', error);
-    return NextResponse.json({ is_active: true });
+    return NextResponse.json({ is_active: true, fallback: true });
   }
 }
 
